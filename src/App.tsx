@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 interface CSSVars extends React.CSSProperties {
   "--tile"?: string;
@@ -6,8 +6,8 @@ interface CSSVars extends React.CSSProperties {
   "--glow"?: string;
 }
 
-// 👉 Put your .mp3/.wav files in /public/sounds and update labels+src as you like
-// Vite serves files from /public at the root path, so /public/sounds/x.mp3 is "/sounds/x.mp3"
+// 👉 Put your .mp3/.wav files in /public/sounds
+// These are the clips you've been using; adjust labels/filenames as needed
 const SAMPLES: { id: string; label: string; src: string }[] = [
   { id: "lugnt", label: "Amen de e lugnt", src: "/sounds/amen-de-e-lugnt.mp3" },
   { id: "du", label: "De e du ju", src: "/sounds/de-e-du-ju.mp3" },
@@ -15,12 +15,10 @@ const SAMPLES: { id: string; label: string; src: string }[] = [
   { id: "helvete", label: "Far åt helvete", src: "/sounds/far-at-helvete.mp3" },
   { id: "gris", label: "Grisajävel", src: "/sounds/grisajavel.mp3" },
   { id: "vakna", label: "Jonas vakna!", src: "/sounds/jonas-vakna.mp3" },
-  // Kanske inte behövs << { id: "klunka", label: "De e du ju", src: "/sounds/de-e-du-ju.mp3" },
   { id: "luffare", label: "Luffarjävel", src: "/sounds/luffarjavel.mp3" },
   { id: "tack", label: "Tack", src: "/sounds/tack.mp3" },
   { id: "tommen", label: "Tommen opp", src: "/sounds/tommen-opp.mp3" },
   { id: "tony", label: "Tony!", src: "/sounds/tony.mp3" },
-  // Add more here
 ];
 
 const PALETTES: Array<[string, string]> = [
@@ -124,7 +122,6 @@ body {
 .sb-btn:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
 .sb-btn-label { text-wrap: balance; }
 .sb-btn[data-active="true"] {
-  /* derive glow from --glow using color-mix; falls back to white if unsupported */
   box-shadow:
     0 0 0 3px rgba(255,255,255,0.08),
     0 0 24px 6px color-mix(in srgb, var(--glow, #ffffff), transparent 65%),
@@ -145,14 +142,13 @@ export default function App() {
   const [active, setActive] = useState<Set<string>>(new Set());
   const playersRef = useRef<Map<string, HTMLAudioElement>>(new Map());
 
-  // Preload samples on mount
+  // Preload one Audio instance per sample and wire listeners
   useEffect(() => {
     SAMPLES.forEach((s) => {
       const existing = playersRef.current.get(s.id);
       if (existing) return;
       const a = new Audio(s.src);
       a.preload = "auto";
-      // Attach listeners once per audio
       a.addEventListener("error", () => {
         const mediaError: MediaError | null = a.error;
         console.warn("Audio tag error", { src: s.src, code: mediaError?.code });
@@ -161,7 +157,7 @@ export default function App() {
         console.warn("Audio stalled", { src: s.src });
       });
       a.addEventListener("play", () => {
-        setActive((prev) => new Set(prev).add(s.id));
+        setActive(new Set([s.id]));
       });
       a.addEventListener("ended", () => {
         setActive((prev) => {
@@ -174,62 +170,33 @@ export default function App() {
     });
   }, []);
 
+  // Title + emoji favicon
   useEffect(() => {
-    // Set page title
     if (document.title !== "Tony!") document.title = "Tony!";
-    // Create an emoji favicon
     const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><text x='50%' y='52%' dominant-baseline='middle' text-anchor='middle' font-size='52'>👍</text></svg>`;
     const href = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
     let link = document.querySelector("link[rel='icon']") as HTMLLinkElement | null;
-    if (!link) {
-      link = document.createElement("link");
-      link.rel = "icon";
-      document.head.appendChild(link);
-    }
+    if (!link) { link = document.createElement("link"); link.rel = "icon"; document.head.appendChild(link); }
     link.href = href;
   }, []);
 
   function play(src: string, id: string) {
-    // Ensure we have a single Audio instance for this id
     let a = playersRef.current.get(id);
     if (!a) {
       a = new Audio(src);
       a.preload = "auto";
-      a.addEventListener("error", () => {
-        const mediaError: MediaError | null = a!.error;
-        console.warn("Audio tag error", { src, code: mediaError?.code });
-      });
-      a.addEventListener("stalled", () => {
-        console.warn("Audio stalled", { src });
-      });
-      a.addEventListener("play", () => {
-        // Mark only this id as active on play
-        setActive(new Set([id]));
-      });
-      a.addEventListener("ended", () => {
-        setActive((prev) => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
-      });
+      a.addEventListener("play", () => setActive(new Set([id])));
+      a.addEventListener("ended", () => setActive((prev) => { const n = new Set(prev); n.delete(id); return n; }));
       playersRef.current.set(id, a);
     }
-
     try {
-      // Stop and reset all other audios to enforce single-playback
+      // Single-playback: stop all others
       playersRef.current.forEach((p, key) => {
-        if (key !== id) {
-          try { p.pause(); } catch {}
-          try { p.currentTime = 0; } catch {}
-        }
+        if (key !== id) { try { p.pause(); } catch {} try { p.currentTime = 0; } catch {} }
       });
-
-      // Restart this sample from the top and play
       a.pause();
       a.currentTime = 0;
       void a.play();
-      // Immediately reflect active state to avoid UI lag
       setActive(new Set([id]));
     } catch (err) {
       console.warn("Audio play failed:", err);
