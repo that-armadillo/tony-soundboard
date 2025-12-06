@@ -20,6 +20,7 @@ const SAMPLES: { id: string; label: string; src: string }[] = [
   { id: "tommen", label: "Tommen opp", src: "/sounds/tommen-opp.mp3" },
   { id: "tony", label: "Tony!", src: "/sounds/tony.mp3" },
   { id: "klunka", label: "Nån skrev klunka", src: "/sounds/skrev-klunka.mp3" },
+  { id: "vrala", label: "Sitta å vråla", src: "/sounds/sitta-a-vrala.mp3" },
 ];
 
 const PALETTES: Array<[string, string]> = [
